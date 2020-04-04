@@ -1,0 +1,94 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: Ensure NTP (for time sync) is installed.
+    yum:
+      name: ntp
+      state: present
+  - name: Ensure NTP is running
+    service:
+      name: ntpd
+      state: started
+      enabled: yes  
+
+  - name: Install packages
+    yum:
+      name:
+        - httpd
+        - git
+        - acl
+        - nano
+        - php
+        - php-mysql
+        - php-pdo
+        - php-gd
+        - php-mbstring
+      state: present
+    
+#  - name: copy file
+#    shell: echo "<?php phpinfo (); ?>" > /var/www/html/info.php
+
+  - name: install mariadb
+    yum:
+      name:
+        - mariadb-server
+        - mariadb
+      state: present
+  
+  - name: Ensure /var/www/html directory has correct permissions.
+    file:
+      path: /var/www/html
+      state: directory
+      mode: 0777
+      owner: vagrant
+      group: vagrant
+
+  - name: restart httpd
+    service:
+      name: httpd
+      state: restarted
+
+  - name: upgrade all packages
+    yum:
+      name: '*'
+      state: latest
+
+
+
+  - name: Ensure .ssh directory exists.
+    file:
+      path: /root/.ssh
+      state: directory
+      mode: 0700
+      owner: root
+      group: root
+
+  - name: Ensure GitHub deploy key is present on the server.
+    copy:
+      content: "{{ lookup('file', '/users/Allen/.ssh/inventory') }}"
+      dest: /root/.ssh/id_rsa
+      mode: 0600
+      owner: root
+      group: root
+
+  - name: Ensure GitHub deploy public key is present on the server.
+    copy:
+      content: "{{ lookup('file', '/users/Allen/.ssh/inventory.pub') }}"
+      dest: /root/.ssh/id_rsa.pub
+      mode: 0600
+      owner: root
+      group: root
+
+# See: https://stackoverflow.com/a/37096534/100134
+#  - name: install setfacl support
+#    become: yes
+#    yum: name=acl
+
+  - name: Clone the code repository to the docroot.
+    git:
+      repo: "git@github.com:AllenEllis/inventory.git"
+      dest: /var/www/html/inventory
+      accept_hostkey: yes
+      #key_file: /root/.ssh/id_rsa
+    become_user: root
